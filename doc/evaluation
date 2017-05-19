@@ -1,0 +1,41 @@
+#|
+Some examples of terms for which the judgement ⇓ holds.
+|#
+
+; writing a value to a port
+(judgment-holds (⇓ (((port 8080) ((num 30))))
+	(out((port 8080) 🡐 (num 10)))
+	: μ ) μ)
+(judgment-holds (⇓ ()
+	(out((port 8080) 🡐 (num 10)))
+	: μ ) μ)
+
+; conditional branching
+(judgment-holds (⇓ () 
+	(if ((num 0)) 
+		{ (out ((port 8080) 🡐 (num 10))) } else 
+		{ (out ((port 8080) 🡐 (num 20))) } ) 
+	: μ ) μ)
+(judgment-holds (⇓ (((loc 1) (num 42))) 
+	(if ((loc 1)) 
+		{ (out ((port 8080) 🡐 (num 10))) } else 
+		{ (out ((port 8080) 🡐 (num 20))) } ) 
+	: μ ) μ)
+
+; introducing a new variable into the scope
+(judgment-holds (⇓ () 
+	(let var "truebranch" := (num 10) in (out ((port 8080) 🡐 "truebranch")))
+	: μ ) μ)
+
+; while-loop and command sequence with ";"
+(judgment-holds (⇓ (()) 
+	(while (0) do { (out ((port 8080) 🡐 10)) } )
+	: μ ) μ)
+#| NOTE: Need to implement the sequence command before being able to write any usefull while-example
+(judgment-holds (⇓ (()) 
+	(let var "variable" := 1 in
+		(while ("variable") do { 
+			("variable" := 0);
+			(out ((port 8080) 🡐 10)) } ))
+	: μ ) μ)
+|#
