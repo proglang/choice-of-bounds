@@ -6,9 +6,9 @@ Some examples of terms for which the judgement ⇓ holds.
 (judgment-holds (⇓ (((port 8080) ((num 30))))
 	(out((port 8080) 🡐 (num 10)))
 	: μ ) μ)
-(judgment-holds (⇓ ()
-	(out((port 8080) 🡐 (num 10)))
-	: μ ) μ)
+(judgment-holds
+ (⇓ () (out((port 8080) 🡐 (num 10))): μ )
+ μ)
 (judgment-holds (⇓ (((loc 1) (num 10)))
 	(out((port 8080) 🡐 (loc 1)))
 	: μ ) μ)
@@ -48,7 +48,7 @@ Some examples of terms for which the judgement ⇓ holds.
         (let var "y" := (num 30) in ((out((port 8080) 🡐 "y")) then (out((port 8080) 🡐 (num 20)))))  
 	: μ ) μ)
 
-(println "addinging two expressions together")
+(println "adding two expressions together")
 (judgment-holds (⇓ (((loc 1)(num -3))) 
 	(let var "somevar" := ((num 32) + (loc 1)) in (out ((port 8080) 🡐 "somevar")))
 	: μ ) μ)
