@@ -1,19 +1,22 @@
 #lang racket
 (require redex)
 
+(provide VSIDO ⇓ extL)
+
 (define-language VSIDO
   (M ::= C E μ) ; helper needed for the substitution function
+  (V ::= X L) ; variables
   (C ::= (L := E)
      (out(P 🡐 E))
      (if (E) {C} else {C})
      (while (E) do {C})
      (let var X := E in C)
      (C then C))
-  (E ::= N L X (E + E)) ; expression
+  (E ::= N V (E + E)) ; expression
   (N ::= (num number)) ; numbers
   (L ::= (loc number)) ; locations
   (P ::= (port number)) ; ports
-  (X ::= string) ; vars
+  (X ::= string) ; literals
   (STORE-ELEM ::= (L N) (P (N ...))) ; helper sum for locations and ports
   (μ ::= (STORE-ELEM ...))) ; mapping for the locations and ports
 
@@ -21,7 +24,7 @@
   #:mode (⇓ I I I O)
   #:contract (⇓ μ C : μ)
 
-  [; R-LET
+  [; R-ASSIGN
    ---------------------------
    (⇓ μ_1 (L := E) : (extL μ_1 L E))]
 
@@ -30,7 +33,7 @@
    (⇓ μ_1 (out(P 🡐 E)) : (extP μ_1 P (eval μ_1 E)))]
    
   [(⇓ μ_1 (subst C X E) : μ_2); R-LET
-   ---------------------------
+   --------------------------- 
    (⇓ μ_1 (let var X := E in C) : μ_2)]
   
    [(⇓ μ_1 C_1 : μ_2) ; R-SEQ
@@ -54,7 +57,7 @@
    (⇓ μ_1 (while (E_1) do {C_1}) : μ_2)]
   
   [(evals-to-zero? μ_1 E_1); R-WHILE-FALSE
-   ---------------------------
+   --------------------------- 
    (⇓ μ_1 (while (E_1) do {C_1}) : μ_1)])
 
 
@@ -72,19 +75,20 @@
 (define-metafunction VSIDO
   ; appends a number to a port's output. Examples:
   ; ([1 (2 3 4)] [2 (9 9 9)]) 2 7 => ([1 (2 3 4)] [2 (9 9 9 7)])
-  ; ([1 (2 3 4)]) 2 7             => ([1 (2 3 4)] [2 (7)])
+  ; ([1 (2 3 4)]            ) 2 7 => ([1 (2 3 4)] [2 (      7)])
   extP : (any ...) P N -> (any ...)
-  [(extP (any_0 ... (P (any_1 ... )) any_2 ...) P N)
-   (any_0 ... (P (any_1 ... N)) any_2 ...)]
+  [(extP (any_0 ... (P (any_1 ...  )) any_2 ...) P N)
+         (any_0 ... (P (any_1 ... N)) any_2 ...)]
   [(extP (any_0 ...) P N)
-   (any_0 ... (P (N)))])
+         (any_0 ... (P (N)))])
 
 (define-metafunction VSIDO
-  extL : (any ...) L N -> (any ...)
-  [(extL (any_0 ... (L N_0) any_1 ...) L N_1)
-   (any_0 ... (L N_1) any_1 ...)]
-  [(extL (any_0 ...) L N)
-   (any_0 ... (L N))])
+  ; updates the location mapping. Locations can be mapped to expressions or types.
+  extL : (any ...) L any -> (any ...)
+  [(extL (any_0 ... (L any) any_1 ...) L any_2)
+         (any_0 ... (L any_2) any_1 ...)]
+  [(extL (any_0 ...) L any_2)
+         (any_0 ... (L any_2))])
 
 (define-metafunction VSIDO
   eval : (any ...) E -> N
