@@ -1,11 +1,14 @@
 #lang racket
 (require redex "VSIDO.rkt" rackunit)
 
+(provide VSIDOT ▷ choice choiceEnv remassoc declassify ⊑ ≤)
+
 (define-extended-language VSIDOT VSIDO
-  (T ::= (LAB ...))
-  (LAB ::= (number ...))
+  (T ::= ((LAB ...) ...))
+  (LAB ::= number)
   (E ::= ....
-     (E :: T))
+     (E :: T)
+     (dcl E LAB LAB LAB))
   (Γ ::= ((V T) ...)) ; variable type environment
   (Σ ::= ((P T) ...)))
 
@@ -33,7 +36,7 @@
   [(where T_newContext (multiplication T_π (evalT Γ_1 E_1)))
    (▷ Σ Γ_1 T_newContext C_1 : Γ_2) (▷ Σ Γ_1 T_newContext C_2 : Γ_3)
    --------------------------- IF
-   (▷ Σ Γ_1 T_π (if (E_1) {C_1} else {C_2}) : (choice Γ_2 Γ_3))]
+   (▷ Σ Γ_1 T_π (if (E_1) {C_1} else {C_2}) : (choiceEnv Γ_2 Γ_3))]
   [
    --------------------------- WHILE
    (▷ Σ Γ_1 T_π (while (E_1) do {C_1}) : (sumWhileTypes Σ Γ_1 T_π E_1 C_1))])
@@ -49,13 +52,13 @@
   substT : Γ X T -> Γ)
 
 (define-metafunction VSIDOT
-  ⊑ : LAB LAB -> boolean
-  [(⊑ LAB_1 LAB_2)
+  ⊑ : (LAB ...) (LAB ...) -> boolean
+  [(⊑ (name lhs (LAB_0 ...)) (name rhs (LAB_1 ...)))
    ,(not
     (false?
      (for/and
-         ([lhs-elem (term LAB_1)])
-       (member lhs-elem (term LAB_2)))))])
+         ([lhs-elem (term lhs)])
+       (member lhs-elem (term rhs)))))])
 (define-metafunction VSIDOT
   ≤ : T T -> boolean
   [(≤ T_1 T_2)
@@ -69,9 +72,16 @@
   choice : T T -> T
   [(choice T_1 T_2) ,(append (term T_1) (term T_2))])
 
-(define-metafunction VSIDOT ; TODO: in progress
+(define-metafunction VSIDOT
   choiceEnv : Γ Γ -> Γ
-  [(choiceEnv T_1 T_2) ,(append (term T_1) (term T_2))])
+  [(choiceEnv (name left (_ ... (V_1 T_1) _ ...)_left) (name right (_ ... (V_1 T_2) _ ...)))
+   ,(append
+     (list (term (V_1 (choice T_1 T_2))))
+     (term (choiceEnv
+            ,(remassoc (term V_1) (term left))
+            ,(remassoc (term V_1) (term right)))))]
+  [(choiceEnv Γ_1 Γ_2)
+   ,(append (term Γ_1) (term Γ_2))])
 
 (define-metafunction VSIDOT
   multiplication : T T -> T
@@ -89,87 +99,35 @@
       accumulator)])
 
 (define-metafunction VSIDOT
-  evalT : Γ E -> T ; TODO: ADD DECLASS
+  declassify : (LAB ...) (LAB ...) (LAB ...) (LAB ...) -> T
+  [(declassify (name to-map (LAB ...)) (name A (LAB ...)) (name B (LAB ...)) (name C (LAB ...)))
+   (cond
+        [(and (⊑ to-map A) (⊑ to-map B) (not (⊑ to-map C))) C]
+        [else to-map])])
+
+(define-metafunction VSIDOT
+  evalT : Γ E -> T
   [(evalT _ N)     (())]
   [(evalT _ (_ :: T)) T]
   [(evalT Γ_1 X_1) ,(second (assoc (term X_1) (term Γ_1)))]
+  [(evalT Γ_1 (dcl E_1 LAB_A LAB_B LAB_C))
+   (map
+    (lambda (lables)
+      (declassify lables LAB_A LAB_B LAB_C))
+    (evalT Γ_1 E_1))]
   [(evalT Γ_1 (M_1 + M_2))
    (multiplication
     (evalT Γ_1 M_1)
     (evalT Γ_1 M_2))])
 
+(define-metafunction VSIDOT
+  ; updates the location mapping. Locations can be mapped to expressions or types.
+  extL : (any ...) L any -> (any ...)
+  [(extL (any_0 ... (L any) any_1 ...) L any_2)
+         (any_0 ... (L any_2) any_1 ...)]
+  [(extL (any_0 ...) L any_2)
+         (any_0 ... (L any_2))])
 
-(println "------------------ Test: Type judgments")
-(println "assign - introduce new location")
-(judgment-holds
- (▷ () (((loc 1) ((4 5 7)))) (()) ((loc 3) := ((num 3) :: ((1 2 3)))) : Γ)
- Γ)
-(println "assign - update location")
-(judgment-holds
- (▷ () (((loc 3) ((4 5 7)))) (()) ((loc 3) := ((num 3) :: ((1 2 3)))) : Γ)
- Γ)
-(println "out - success")
-(judgment-holds
- (▷ (((port 1) ((10)))) () ((3)) (out((port 1) 🡐 ((num 3) :: ((1 2 3))))) : Γ)
- Γ)
-(println "out - failure") ; TODO: should fail
-(judgment-holds
- (▷ (((port 1) (()))) () ((3)) (out((port 1) 🡐 ((num 3) :: ((1 2 3))))) : Γ)
- Γ)
-;(println "let")
-;(judgment-holds
-; (▷ () () () (let var "x" := ((num 3) :: ((1 2 3))) in ((loc 3) := "x")) : Γ)
-; Γ)
-(println "seq")
-(judgment-holds
- (▷ () (((loc 1) ((4)))) ((9)) (((loc 1) := ((num 3) :: ((3)))) then ((loc 1) := ((num 3) :: ((2))))) : Γ)
- Γ)
-(println "if")
-(judgment-holds
- (▷ () (((loc 1) ((4)))) ((9)) (if (((num 3) :: ((5))))
-                                   {((loc 1) := ((num 42) :: ((2))))} else
-                                   {((loc 1) := ((num 42) :: ((1))))}) : Γ)
- Γ)
-(println "while")
-
-(println "------------------ Test: Metafunctions")
-(println "Test: ⊑")
-(check-true (term (⊑ (1 3 2 4) (4 3 5 2 6 1))))
-(check-false (term (⊑ (1 3 2 7) (4 3 5 2 6 1))))
-(println "Test: ≤")
-(check-true (term (≤ (()) ((1)))))
-(check-true (term (≤ ((1 2) (3)) ((1 2 3)))))
-(check-true (term (≤ (choice ((1)) ((2))) ((1) (2)))))
-(check-true (term (≤ ((1) (2)) ((1 2)))))
-(check-true (and (term (≤ ((1) (2) (1 2)) ((1 2)))) (term (≤ ((1 2)) ((1) (2) (1 2)))))) ; ≤ not antisymetric
-(check-false (term (≤ ((3)) ((1)))))
-(check-false (term (≤ ((3)) (()))))
-(check-false (term (≤ ((3 2)) ((3)))))
-
-
-
-(term (choice ((1 2) (3 4)) ((5 6))))
-(term (multiplication ((1 2) (3 4)) ((5 6))))
-(term (multiplication ((1 2) (3 4)) ((5 6) (7 8) (9))))
-
-(test-equal
- (term (choice ((1 2) (3 4)) ((5 6))))
- (term ((1 2) (3 4) (5 6))))
-
-;; evalT
-(test-equal ; simple num case
- (term (evalT
-        ()
-        (num 3)))
- (term (())))
-(test-equal ; variable lookup
- (term (evalT
-        (("y" ((1 9))) ("x" ((2 4 5))))
-        "x"))
- (term ((2 4 5))))
-(test-equal ; addition
- (term (evalT
-        (("y" ((1 9))) ("x" ((2 4 8))))
-        ((num 3) + "x")))
- (term ((2 4 8))))
+(define (remassoc v lst)
+  (remove (assoc v lst) lst))
 
