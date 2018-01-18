@@ -1,24 +1,7 @@
 #lang racket
-(require redex)
+(require redex "Grammar.rkt")
 
-(provide VSIDO ⇓ fresh-location extμ subst)
-
-(define-language VSIDO
-  (M ::= C E μ) ; helper needed for the substitution function
-  (V ::= X L) ; variables
-  (C ::= (V := E)
-     (out(P 🡐 E))
-     (if (E) {C} else {C})
-     (while (E) do {C})
-     (let var X := E in C)
-     (C then C))
-  (E ::= N V (E + E)) ; expression
-  (N ::= (num number)) ; numbers
-  (L ::= (loc number)) ; locations
-  (P ::= (port number)) ; ports
-  (X ::= variable-not-otherwise-mentioned) ; literals
-  (STORE-ELEM ::= (L N) (P (N ...))) ; helper sum for locations and ports
-  (μ ::= (STORE-ELEM ...))) ; mapping for the locations and ports
+(provide ⇓ fresh-location ext subst lookup)
 
 (define-judgment-form VSIDO
   #:mode (⇓ I I I O)
@@ -26,15 +9,15 @@
 
   [
    --------------------------- R-ASSIGN
-   (⇓ μ_1 (L := E) : (extμ μ_1 L (eval μ_1 E)))]
+   (⇓ μ_1 (L := E) : (ext μ_1 L (eval μ_1 E)))]
 
   [
    --------------------------- R-OUT
-   (⇓ μ_1 (out(P 🡐 E)) : (extμ μ_1 P (eval μ_1 E)))]
+   (⇓ μ_1 (out(P < E)) : (ext μ_1 P (eval μ_1 E)))]
    
   [(where L_1 (fresh-location μ_1))
    (where N_1 (eval μ_1 E_1))
-   (⇓ (extμ μ_1 L_1 N_1) (subst C_1 X_1 L_1) : μ_2)
+   (⇓ (ext μ_1 L_1 N_1) (subst C_1 X_1 L_1) : μ_2)
    --------------------------- R-LET
    (⇓ μ_1 (let var X_1 := E_1 in C_1) : μ_2)]
   
@@ -76,24 +59,6 @@
   [(evals-to-biggerzero? (_ ... (L (num (side-condition (name N_1 number) (positive? (term N_1))))) _ ... ) L)])
 
 (define-metafunction VSIDO
-  ; Updates the environment μ.
-  ; If a port should be updated, the new value either gets appended to the existing port or a new port is introduced into the environment.
-  ; ([1 (2 3 4)] [2 (9 9 9)]) 2 7 => ([1 (2 3 4)] [2 (9 9 9 7)])
-  ; ([1 (2 3 4)]            ) 2 7 => ([1 (2 3 4)] [2 (      7)])
-  ; If a location should be updated, either its old value is replaced if already existent or it gets introduced with its new value.
-  ; ([1 42]      [2     111]) 2 7 => ([1      42] [2         7])
-  ; ([1 42]                 ) 2 7 => ([1      42] [2         7])
-  extμ : μ any N -> μ
-  [(extμ (any_0 ... (P (any_1 ...  )) any_2 ...) P N)
-         (any_0 ... (P (any_1 ... N)) any_2 ...)]
-  [(extμ (any_0 ...) P N)
-         (any_0 ... (P (N)))]
-  [(extμ (any_0 ... (L any) any_1 ...) L N)
-         (any_0 ... (L N) any_1 ...)]
-  [(extμ (any_0 ...) L N)
-         (any_0 ... (L N))])
-
-(define-metafunction VSIDO
   eval : (any ...) E -> N
   [(eval _ N) N]
   [(eval (any_0 ... (L N) any_1 ...) L) N]
@@ -110,8 +75,8 @@
           (let var X_1 := E_1 in C)]
   [(subst (let var X_1 := E_1 in C) X_2 L_2) 
           (let var X_1 := (subst E_1 X_2 L_2) in (subst C X_2 L_2))]
-  [(subst (out(P 🡐        E_1      )) X L_2) 
-          (out(P 🡐 (subst E_1 X L_2))      )]
+  [(subst (out(P <        E_1      )) X L_2) 
+          (out(P < (subst E_1 X L_2))      )]
   [(subst (       C_1      then        C_2    ) X L) 
           ((subst C_1 X L) then (subst C_2 X L)    )]
   [(subst (       E_1      +        E_2) X L)

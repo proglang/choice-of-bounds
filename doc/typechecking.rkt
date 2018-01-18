@@ -28,7 +28,7 @@
   ((CONDI ((6))) (A ((1))) (B ((2))))
   ()
   (if(CONDI)
-     {(out((port 1) 🡐 A))} else
+     {(let var y := ((num 3) :: ((1 2 3))) in (out((port 1) 🡐 A)))} else
      {(out((port 1) 🡐 B))})
   : Γ)
  Γ)
@@ -40,7 +40,7 @@
   ((CONDI ((5))) (A ((1))) (B ((2))))
   ()
   (if(CONDI)
-     {(out((port 1) 🡐 A))} else
+     {(() then (out((port 1) 🡐 A)))} else
      {(out((port 1) 🡐 B))})
   : Γ)
  Γ)
