@@ -2,11 +2,18 @@
 
 (require redex "../src/Typecheck.rkt" rackunit)
 
-'((1) (9))
-(flatten '((1) (9)))
 
-(cartesian-product '((1) (2 3)) '((9)))
-(map flatten (cartesian-product '((1) (2 3)) '((9))))
+(test-equal
+ (term (multiplication ((1) (2 3)) () ))
+ '((1) (2 3)))
+(test-equal
+ (term (multiplication () ((1) (2 3)) ))
+ '((1) (2 3)))
+(test-equal
+ (term (multiplication ((1) (2 3)) ((8 2)) ))
+ '((1 8 2) (2 3 8 2)))
+(test-equal
+ (term (multiplication ((1) (2 3)) ((8) (9)) ))
+ '((1 8) (1 9) (2 3 8) (2 3 9)))
 
-;(term (multiplication ((4 5) (6)) ()))
-;(term (≤ (multiplication ((4 5) (6)) ()) ((7))))
+(println "All tests run successfully.")

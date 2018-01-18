@@ -94,20 +94,10 @@
 ; [ (1 2) (3) ] [ (4 5) (6 7) ] -> [ (1 2 4 5) (1 2 6 7) (3 4 5) (3 6 7) ]
 (define-metafunction VSIDO
   multiplication : T T -> T
+  [(multiplication T_1 ()) T_1]
+  [(multiplication () T_2) T_2]
   [(multiplication T_1 T_2)
-   ,(cartesian-product (term T_1) (term T_2))])
-   
-;   ,(let ([accumulator '()])
-;      (for-each (lambda (lhs-elem)
-;         (for-each (lambda (rhs-elem)
-;            (set!
-;             accumulator
-;             (append
-;              accumulator
-;              (cons (append lhs-elem rhs-elem) null))))
-;          (term T_2)))
-;       (term T_1))
-;      accumulator)])
+   ,(map flatten (cartesian-product (term T_1) (term T_2)))])
 
 (define-metafunction VSIDO ; declassifies a COB type
   declassify : T LAB LAB LAB -> T
