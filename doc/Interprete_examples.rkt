@@ -1,5 +1,5 @@
 #lang racket
-(require redex "../src/VSIDO.rkt")
+(require redex "../src/Interprete.rkt")
 
 #|
 These examples demonstrate the semantics of VSIDO. To view results, simply execute this file.
@@ -39,59 +39,59 @@ Simple example terms.
 
 (println "writing a value to a port")
 (judgment-holds (⇓ (((port 8080) ((num 30))))
-	(out((port 8080) 🡐 (num 10)))
+	(out((port 8080) < (num 10)))
 	: μ ) μ)
 (judgment-holds
- (⇓ () (out((port 8080) 🡐 (num 10))): μ )
+ (⇓ () (out((port 8080) < (num 10))): μ )
  μ)
 (judgment-holds (⇓ (((loc 1) (num 10)))
-	(out((port 8080) 🡐 (loc 1)))
+	(out((port 8080) < (loc 1)))
 	: μ ) μ)
 
 (println "conditional branching")
 (judgment-holds (⇓ () 
 	(if ((num 0)) 
-		{ (out ((port 8080) 🡐 (num 10))) } else 
-		{ (out ((port 8080) 🡐 (num 20))) } ) 
+		{ (out ((port 8080) < (num 10))) } else 
+		{ (out ((port 8080) < (num 20))) } ) 
 	: μ ) μ)
 (judgment-holds (⇓ (((loc 1) (num 42))) 
 	(if ((loc 1)) 
-		{ (out ((port 8080) 🡐 (num 10))) } else 
-		{ (out ((port 8080) 🡐 (num 20))) } ) 
+		{ (out ((port 8080) < (num 10))) } else 
+		{ (out ((port 8080) < (num 20))) } ) 
 	: μ ) μ)
 
 (println "introducing a new variable into an empty scope")
 (judgment-holds (⇓ () 
-	(let var somevar := (num 10) in (out ((port 8080) 🡐 somevar)))
+	(let var somevar := (num 10) in (out ((port 8080) < somevar)))
 	: μ ) μ)
 (println "introducing a new variable into an non-empty scope")
 (judgment-holds (⇓ (((loc 1) (num 42))) 
-	(let var somevar := (num 10) in (out ((port 8080) 🡐 somevar)))
+	(let var somevar := (num 10) in (out ((port 8080) < somevar)))
 	: μ ) μ)
 
 (println "introducing a new variables: overshadowing")
 (judgment-holds (⇓ () 
                    (let var somevar := (num 10) in
                      ((somevar := (num 20)) then
-                      ((out ((port 8080) 🡐 somevar)) then
+                      ((out ((port 8080) < somevar)) then
                       (let var somevar := (num 30) in
-                      (out ((port 8080) 🡐 somevar))))))
+                      (out ((port 8080) < somevar))))))
                    : μ ) μ)
 
 (println "assigning a expression to a location")
 (judgment-holds (⇓ (((loc 1) (num 41))) 
-	(((loc 1) := (num 42)) then (out((port 8080) 🡐 (loc 1))))
+	(((loc 1) := (num 42)) then (out((port 8080) < (loc 1))))
 	: μ ) μ)
 
 (println "while-loop and command sequence with 'then'")
 (judgment-holds (⇓ () 
-	((out((port 8080) 🡐 (num 10))) then (out((port 8080) 🡐 (num 20))))
+	((out((port 8080) < (num 10))) then (out((port 8080) < (num 20))))
 	: μ ) μ)
 (judgment-holds (⇓ ()
-        (let var y := (num 30) in ((out((port 8080) 🡐 y)) then (out((port 8080) 🡐 (num 20)))))  
+        (let var y := (num 30) in ((out((port 8080) < y)) then (out((port 8080) < (num 20)))))  
 	: μ ) μ)
 
 (println "adding two expressions together")
 (judgment-holds (⇓ (((loc 1)(num -3))) 
-	(let var somevar := ((num 32) + (loc 1)) in (out ((port 8080) 🡐 somevar)))
+	(let var somevar := ((num 32) + (loc 1)) in (out ((port 8080) < somevar)))
 	: μ ) μ)

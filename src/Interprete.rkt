@@ -1,7 +1,7 @@
 #lang racket
-(require redex "Grammar.rkt")
+(require redex "Grammar.rkt" "Typecheck.rkt")
 
-(provide ⇓ fresh-location ext subst lookup)
+(provide ⇓ fresh-location evals-to-biggerzero? evals-to-zero? ext subst lookup eval booleanToN)
 
 (define-judgment-form VSIDO
   #:mode (⇓ I I I O)
@@ -50,20 +50,53 @@
 (define-judgment-form VSIDO
   #:mode (evals-to-zero? I I)
   #:contract (evals-to-zero? μ E)
-  [(evals-to-zero? _ (num (side-condition (name N_1 number) (not (positive? (term N_1))))))]
-  [(evals-to-zero? (_ ... (L (num (side-condition (name N_1 number) (not (positive? (term N_1)))))) _ ... ) L)])
+  [(side-condition (not (≤ (eval μ_1 E_1) (eval μ_1 E_2))))
+   ---------------------------
+   (evals-to-zero? μ_1 (E_1 ⊆ E_2) )]
+  [(evals-to-zero? _ (side-condition (name N_1 N) (not (positive? (second (term N_1))))))]
+  [(evals-to-zero? (_ ... (V (side-condition (name N_1 N) (not (positive? (second (term N_1)))))) _ ... ) V)]
+)
 (define-judgment-form VSIDO
   #:mode (evals-to-biggerzero? I I)
   #:contract (evals-to-biggerzero? μ E)
+  [(side-condition (≤ (eval μ_1 E_1) (eval μ_1 E_2)))
+   ---------------------------
+   (evals-to-biggerzero? μ_1 (E_1 ⊆ E_2) )]
   [(evals-to-biggerzero? _ (side-condition (name N_1 N) (positive? (second (term N_1)))))]
-  [(evals-to-biggerzero? (_ ... (L (num (side-condition (name N_1 number) (positive? (term N_1))))) _ ... ) L)])
+  [(evals-to-biggerzero? (_ ... (V (side-condition (name N_1 N) (positive? (second (term N_1))))) _ ... ) V)]
+  )
+
+;(define-metafunction VSIDO
+;  eval : μ E -> Evaled
+;  [(eval _ N) N]
+;  [(eval (_ ... (V N) _ ...) V) N]
+;  [(eval μ_1 (E_0 + E_1))
+;   (num ,(+ (second (term (eval μ_1 E_0))) (second (term (eval μ_1 E_1)))))])
+
+;(define firstTotal (lambda (ls)
+;                     (if (cons? ls) (first ls) '())))
 
 (define-metafunction VSIDO
-  eval : (any ...) E -> N
+  eval : μ E -> any
   [(eval _ N) N]
-  [(eval (any_0 ... (L N) any_1 ...) L) N]
+  [(eval (_ ... (V N) _ ...) V) N]
   [(eval μ_1 (E_0 + E_1))
-   (num ,(+ (second (term (eval μ_1 E_0))) (second (term (eval μ_1 E_1)))))])
+   (num ,(+
+          (second (term (eval μ_1 E_0)))
+          (second (term (eval μ_1 E_1)))))]
+  ; From here on, these are the evaluation rules for runtime types. In particular, the types do not contain more than one inner set. 
+  [(eval _ T) T]
+  [(eval (_ ... (V T) _ ...) V) T]
+  
+  [(eval μ_1 (E_1 ∪ E_2)) (,(set-union
+                             (first (term (eval μ_1 E_1)))
+                             (first (term (eval μ_1 E_2)))))]
+  [(eval _ any) any]) ; TODO is this a good idea?
+
+(define-metafunction VSIDO
+  booleanToN : boolean -> N
+  [(booleanToN #t) (num 1)]
+  [(booleanToN #f) (num 0)])
 
 (define-metafunction VSIDO
   subst : M X L -> M

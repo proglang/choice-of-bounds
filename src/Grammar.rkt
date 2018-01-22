@@ -1,7 +1,7 @@
 #lang racket
 (require redex)
 
-(provide VSIDO lookup ext)
+(provide VSIDO lookup ext lookupOrDefault)
 
 (define-language VSIDO
   (M ::= C E μ) ; helper needed for the substitution function
@@ -16,21 +16,25 @@
      halt)
   (E ::= N V (E + E) ; Expression relevant to interpreting the program.
      (dcl E LAB LAB LAB) ; A declassification.
-     LABS ; A lub of a COB.
+     ;LABS ; A lub of a COB.
+     T ; Due to the powerset interpretation, this looks like a type, semantically this is a lub of a COB type's inner sets.
      (E ∪ E) ; Runtime union of two sets of lables.
-     (E ⊆ E)) ; Runtime check whether one set of labels is contained in the other.
+     (E ⊆ E)) ; Runtime check whether one set of labels is contained in the other.)
   (N ::= (num number)) ; numbers
   (L ::= (loc number)) ; locations
   (P ::= (port number)) ; ports
   (X ::= variable-not-otherwise-mentioned) ; literals
-  (STORE-ELEM ::= (L N) (P (N ...))) ; helper sum for locations and ports
+  (STORE-ELEM ::= (V TR) (V N) (P (N ...))) ; helper sum for locations and ports
   (μ ::= (STORE-ELEM ...))
   ; these are needed for type checking
   (LAB ::= number) ; A label. For now, simply a number.
   (LABS ::= (LAB LAB ...)) ; A nonempty set of labels. Used both as inner set of a COB or a lub of a COB.
   (T ::= (LABS ...)) ; COB type. Contains zero or more inner sets consisting of labels.
+  (TR := (LABS) ()) ; Reified COB type - contains on inner set at most because at runtime there only one control flow to represent.
+  (π := T) ; context type.
   (Γ ::= ((V T) ...)) ; Variable type environment.
   (Σ ::= ((P T) ...)) ; Port type environment.
+  (Evaled ::= N T) ; Sum type, for a finer-grained eval metafunction.
   )
 
 (define-metafunction VSIDO
@@ -54,3 +58,8 @@
 (define-metafunction VSIDO
   lookup : (any ...) any -> any
   [(lookup (_ ... (any_k any_v) _ ...) any_k) any_v])
+
+(define-metafunction VSIDO
+  lookupOrDefault : (any ...) any -> any
+  [(lookupOrDefault (_ ... (any_k any_v) _ ...) any_k) any_v]
+  [(lookupOrDefault _ any_1) any_1])

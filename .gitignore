@@ -14,4 +14,16 @@ src/VSIDOL.rkt~
 src/VSIDOLabel.rkt~
 src/VSIDOT.rkt~
 src/compiled/
+doc/SafeInterprete_simple_examples~
+doc/SafeInterprete_tests.rkt~
+doc/evaluation.rkt~
+doc/integrated_examples.rkt~
+doc/optimize_simple_examples.rkt~
+doc/optimize_tests.rkt~
+src/Interprete.rkt~
+src/Optimize.rkt~
+src/Optimize~
+src/SafeInterprete.rkt~
+src/SafeInterprete~
+
 

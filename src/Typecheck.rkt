@@ -1,7 +1,7 @@
 #lang racket
 (require redex "Grammar.rkt" rackunit)
 
-(provide ▷ choice choiceEnv remassoc declassify ⊑ ≤ multiplication)
+(provide ▷ choice choiceEnv remassoc declassify ⊑ ≤ multiplication evalT)
 
 
 (define-judgment-form VSIDO ; type judgements for commands
@@ -67,7 +67,7 @@
 
 (define-metafunction VSIDO
   choice : T T -> T
-  [(choice T_1 T_2) ,(append (term T_1) (term T_2))])
+  [(choice T_1 T_2) ,(set-union (term T_1) (term T_2))])
 
 (define-metafunction VSIDO
   choiceEnv : Γ Γ -> Γ
@@ -131,9 +131,9 @@
 
 (define-metafunction VSIDO
   evalT : Γ E -> T
-  [(evalT _ N)     (())]
-  [(evalT _ (_ :: T)) T]
-  [(evalT Γ_1 X_1) ,(second (assoc (term X_1) (term Γ_1)))]
+  [(evalT _ N)     ()]
+  [(evalT _ T) T]
+  [(evalT (_ ... (V T) _ ...) V) T]
   [(evalT Γ_1 (dcl E_1 LAB_A LAB_B LAB_C))
    (map
     (lambda (lables)
@@ -142,7 +142,11 @@
   [(evalT Γ_1 (M_1 + M_2))
    (multiplication
     (evalT Γ_1 M_1)
-    (evalT Γ_1 M_2))])
+    (evalT Γ_1 M_2))]
+  [(evalT Γ_1 (E_1 ∪ E_2))
+   (,(set-union
+      (first (term (evalT Γ_1 E_1)))
+      (first (term (evalT Γ_1 E_2)))))])
 
 (define-metafunction VSIDO
   ; updates the location mapping. Locations can be mapped to expressions or types.

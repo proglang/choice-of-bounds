@@ -1,7 +1,15 @@
 #lang racket
 
-(require redex "../src/VSIDOT.rkt" rackunit)
+(require redex "../src/Typecheck.rkt" rackunit)
 
+(term (choiceEnv ((CONDI ((6)))  (B ((3))) (A ((1)))) ((CONDI ((6))) (A ((1))) (B ((2))))) )
+
+(term (choiceEnv ((CONDI ((6))) (A ((1))) (B ((3)))) ((CONDI ((6))) (A ((1))) (B ((2))))) )
+(check-true (term (≤ (choice ((1)) ((2))) ((1) (2)))))
+(term (choice ((1 2) (3 4)) ((2 1) (5 6))))
+(term (multiplication ((1 2) (3 4)) ((5 6))))
+(term (multiplication ((5 6)) ((1 2) (3 4)) ))
+(term (multiplication ((1 2) (3 4)) ((5 6) (7 8) (9))))
 
 (println "out - simple - success")
 (judgment-holds
@@ -131,9 +139,8 @@
 ;;
 ;;
 ;;
-;;(term (choice ((1 2) (3 4)) ((5 6))))
-;;(term (multiplication ((1 2) (3 4)) ((5 6))))
-;;(term (multiplication ((1 2) (3 4)) ((5 6) (7 8) (9))))
+;;
+
 ;
 ;(test-equal
 ; (term (choice ((1 2) (3 4)) ((5 6))))
