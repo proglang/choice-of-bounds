@@ -66,16 +66,6 @@
   [(evals-to-biggerzero? (_ ... (V (side-condition (name N_1 N) (positive? (second (term N_1))))) _ ... ) V)]
   )
 
-;(define-metafunction VSIDO
-;  eval : μ E -> Evaled
-;  [(eval _ N) N]
-;  [(eval (_ ... (V N) _ ...) V) N]
-;  [(eval μ_1 (E_0 + E_1))
-;   (num ,(+ (second (term (eval μ_1 E_0))) (second (term (eval μ_1 E_1)))))])
-
-;(define firstTotal (lambda (ls)
-;                     (if (cons? ls) (first ls) '())))
-
 (define-metafunction VSIDO
   eval : μ E -> any
   [(eval _ N) N]
