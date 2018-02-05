@@ -1,24 +1,28 @@
 #lang racket
 (require redex "Grammar.rkt" rackunit)
 
-(provide ▷ choice choiceEnv remassoc declassify ⊑ ≤ multiplication evalT)
+(provide ▷ choice choiceEnv declassify ⊑ ≤ multiplication evalT findWhileEnv)
 
 
 (define-judgment-form VSIDO ; type judgements for commands
   #:mode (▷ I I I I I O)
   #:contract (▷ Σ Γ T M : Γ)
+  
   [
    --------------------------- ASSIGN
-   (▷ Σ Γ_1 T_π (L_1 := E_1) : (extL Γ_1 L_1 (multiplication T_π (evalT Γ_1 E_1))))]
+   (▷ Σ Γ_1 T_π (V_1 := E_1) : (ext Γ_1 V_1 (multiplication T_π (evalT Γ_1 E_1))))]
+
   [(side-condition ; If the side condition does not apply, an error should be thrown! use where/error from a newer redex version for this
      (≤
       (multiplication T_π (evalT Γ_1 E_1))
-      (lookupPortT Σ P_1)))
+      (lookup Σ P_1)))
    --------------------------- OUT
    (▷ Σ Γ_1 T_π (out(P_1 🡐 E_1)) : Γ_1)]
+
   [
    --------------------------- LET
    (▷ Σ Γ_1 T_π (let var X_1 := E_1 in C_1) : (subst Γ_1 X_1 (evalT Γ_1 E_1)))]
+
   [(▷ Σ Γ_1 T_π C_1 : Γ_2)
    (▷ Σ Γ_2 T_π C_2 : Γ_3)
    --------------------------- SEQ
@@ -28,34 +32,40 @@
    (▷ Σ Γ_1 T_newContext C_1 : Γ_2) (▷ Σ Γ_1 T_newContext C_2 : Γ_3)
    --------------------------- IF
    (▷ Σ Γ_1 T_π (if (E_1) {C_1} else {C_2}) : (choiceEnv Γ_2 Γ_3))]
-  
+
   [(▷ Σ Γ_1 T_π C_1 : Γ_2)
-   (side-condition (not (equal? (list->set Γ_1) (list->set Γ_2))))
-   (▷ Σ Γ_2 T_π C_1 : Γ_3)
-   --------------------------- WHILE-REDU ; TODO: WHILE
-   (▷ Σ Γ_1 T_π (while (E_1) do {C_1}) : Γ_3)]
+   --------------------------- WHILE
+   (▷ Σ Γ_1 T_π (while (E_1) do {C_1}) : (findWhileEnv Σ Γ_1 T_π (while (E_1) do {C_1}) Γ_2))]
 
   [
-   --------------------------- WHILE-BASE ; TODO: WHILE
-   (▷ _ Γ_1 _ (while (_) do {_}) : Γ_1)])
+   --------------------------- SKIP
+   (▷ _ Γ_1 _ skip : Γ_1)]
 
+  [
+   --------------------------- HALT
+   (▷ _ Γ_1 _ halt : Γ_1)])
 
+; Overapproximate the type environment that would be produced by repeated execution of a while loop. 
 (define-metafunction VSIDO
-  lookupPortT : Σ P -> T
-  [(lookupPortT (any ... (P T) any ...) P) T])
+  findWhileEnv : Σ Γ T C Γ -> Γ
+  [(findWhileEnv _ Γ_old _ _ Γ_new)
+   Γ_new
+   (side-condition (equal? (term Γ_old) (term Γ_new)))]
+  [(findWhileEnv Σ_1 Γ_old T_1 C_1 Γ_new)
+   (findWhileEnv Σ_1 Γ_new T_1 C_1 Γ_newer)
+   (where Γ_newer ,(first (judgment-holds (▷ Σ_1 Γ_new T_1 C_1 : Γ) Γ)))])
 
-
-(define-metafunction VSIDO
-  substT : Γ X T -> Γ)
-
+; Decide whether one inner set is subset of the other inner set.
 (define-metafunction VSIDO
   ⊑ : (LAB ...) (LAB ...) -> boolean
-  [(⊑ (name lhs (LAB_0 ...)) (name rhs (LAB_1 ...)))
+   [(⊑ (name lhs (LAB_0 ...)) (name rhs (LAB_1 ...)))
    ,(not
     (false?
      (for/and
          ([lhs-elem (term lhs)])
        (member lhs-elem (term rhs)))))])
+
+; Decide whether a given type is contained in another type. 
 (define-metafunction VSIDO
   ≤ : T T -> boolean
   [(≤ T_1 T_2)
@@ -65,29 +75,22 @@
             ([j (term T_2)])
             (term (⊑ ,i ,j))))])
 
+; The sum of two types.
 (define-metafunction VSIDO
   choice : T T -> T
   [(choice T_1 T_2) ,(set-union (term T_1) (term T_2))])
 
+; The sum of two type environments. If a variable is bound in both environments, merge the two old bindings.
 (define-metafunction VSIDO
   choiceEnv : Γ Γ -> Γ
-  [(choiceEnv (name left (_ ... (V_1 T_1) _ ...)) (name right (_ ... (V_1 T_1) _ ...)))
-   ,(sort
-     (append
-      (list (term (V_1 T_1)))
-      (term (choiceEnv
-             ,(remassoc (term V_1) (term left))
-             ,(remassoc (term V_1) (term right)))))
-     (lambda (x y)
-       (string<? (symbol->string (car x)) (symbol->string (car y)))))]
-  [(choiceEnv (name left (_ ... (V_1 T_1) _ ...)) (name right (_ ... (V_1 T_2) _ ...)))
-   ,(append
-     (list (term (V_1 (choice T_1 T_2))))
-     (term (choiceEnv
-            ,(remassoc (term V_1) (term left))
-            ,(remassoc (term V_1) (term right)))))]
   [(choiceEnv Γ_1 Γ_2)
-   ,(append (term Γ_1) (term Γ_2))])
+   ,(foldl
+    (lambda (lelem result)
+      (term (ext Γ_2
+           ,(first lelem)
+           ,(set-union (secondTotal lelem) (secondTotal (assocTotal (first lelem) (term Γ_2)))))))
+    '()
+    (term Γ_1))])
 
 ; product operator: Given COB type A and B, A * B is the set of the pairwise sum of the inner sets of A and B.
 ; [ (1 2)     ] [ (4 5) (6 7) ] -> [ (1 2 4 5) (1 2 6 7)                 ]
@@ -99,14 +102,16 @@
   [(multiplication T_1 T_2)
    ,(map flatten (cartesian-product (term T_1) (term T_2)))])
 
-(define-metafunction VSIDO ; declassifies a COB type
+; Declassify a COB type
+(define-metafunction VSIDO 
   declassify : T LAB LAB LAB -> T
   [(declassify T LAB_A LAB_B LAB_C)
    ,(map
     (lambda (i) (term (declassify-on-sets ,i LAB_A LAB_B LAB_C)))
     (term T))])
 
-(define-metafunction VSIDO ; declassifies a set of labels (equivalenty, a inner set of a COB type)
+; Declassify a set of labels (equivalenty, a inner set of a COB type)
+(define-metafunction VSIDO 
   declassify-on-sets : (LAB ...) LAB LAB LAB -> (LAB ...)
   [(declassify-on-sets (name inner-set (LAB ...)) LAB_A LAB_B LAB_C)
    ,(map
@@ -117,18 +122,7 @@
         [else x]))
     (term inner-set))])
 
-;(term (declassify-on-sets
-;       (1 3 5)
-;       4
-;       4
-;       2))
-;(term (declassify
-;       ((1 3 5))
-;       4
-;       4
-;       2))
-
-
+; Eval an expression to a type.
 (define-metafunction VSIDO
   evalT : Γ E -> T
   [(evalT _ N)     ()]
@@ -144,29 +138,6 @@
     (evalT Γ_1 M_1)
     (evalT Γ_1 M_2))]
   [(evalT Γ_1 (E_1 ∪ E_2))
-   (,(set-union
-      (first (term (evalT Γ_1 E_1)))
-      (first (term (evalT Γ_1 E_2)))))])
-
-(define-metafunction VSIDO
-  ; updates the location mapping. Locations can be mapped to expressions or types.
-  extL : (any ...) L any -> (any ...)
-  [(extL (any_0 ... (L any)   any_1 ...) L any_2)
-         (any_0 ... (L any_2) any_1 ...)]
-  [(extL (any_0 ...) L any_2)
-         (any_0 ... (L any_2))])
-
-(define (remassoc v lst)
-  (remove (assoc v lst) lst))
-
-
-; TODO WHILE-METAFUNCTION
-; TODO Keine Duplicates!
-; TODO indirekt flow
-
-;(redex-match? VSIDO C (term (while ((num 1)) do { ((loc 1) := ((num 42) :: ((2)))) })))
-;
-;(judgment-holds
-; (▷ () (((loc 1) ((4)))) ((9)) (while ((num 1)) do { ((loc 1) := ((num 42) :: ((2)))) }) : Γ)
-; Γ)
-
+   ,(set-union
+     (term (evalT Γ_1 E_1))
+     (term (evalT Γ_1 E_2)))])

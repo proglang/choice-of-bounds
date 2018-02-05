@@ -1,84 +1,40 @@
 #lang racket
 
-(require redex "../src/Grammar.rkt" "../src/Interprete.rkt" "../src/TransformToXLables.rkt"
-         "../src/Optimize.rkt")
+(require redex "../src/TransformToXLabels.rkt" "../src/Optimize.rkt")
 
-(println "indirect flow where dynamic check is necessary. ")
-(define indFlowCmd (judgment-holds
- (>
-  (((port 1) ((5))))
-  ((pc ())(aVar ((2))) (password ((7)(5))))
-  ()
-  ((aVar := password) then (if (aVar)
+; The program that will be used in every example.
+(define program (term ((aVar := password) then (if (aVar)
                                 {(out ((port 1) < (num 42)))} else
-                                {(out ((port 1) < (num -1)))})) : Γ C)
- C))
-(define indFlowEnv (judgment-holds
- (>
-  (((port 1) ((5))))
-  ((pc ())(aVar ((2))) (password ((7)(5))))
-  ()
-  ((aVar := password) then (if (aVar)
-                                {(out ((port 1) < (num 42)))} else
-                                {(out ((port 1) < (num -1)))})) : Γ C)
- Γ))
-indFlowEnv
-indFlowCmd
-(judgment-holds (⟹
-                 ,(first indFlowEnv)
-                 ,(first indFlowCmd) : C ) C)
-(println "indirect flow where dynamic check not necessary because output will always succeed. ")
-(define indFlowCmdSuc (judgment-holds
- (>
-  (((port 1) ((5))))
-  ((pc ())(aVar ((2))) (password ((5))))
-  ()
-  ((aVar := password) then (if (aVar)
-                                {(out ((port 1) < (num 42)))} else
-                                {(out ((port 1) < (num -1)))})) : Γ C)
- C))
-(define indFlowEnvSuc (judgment-holds
- (>
-  (((port 1) ((5))))
-  ((pc ())(aVar ((2))) (password ((5))))
-  ()
-  ((aVar := password) then (if (aVar)
-                                {(out ((port 1) < (num 42)))} else
-                                {(out ((port 1) < (num -1)))})) : Γ C)
- Γ))
-;indFlowEnvSuc
-;indFlowCmdSuc
-(judgment-holds (⟹
-                 ,(first indFlowEnvSuc)
-                 ,(first indFlowCmdSuc) : C ) C)
+                                {(out ((port 1) < (num -1)))}))))
 
-(println "indirect flow where dynamic check not necessary because output will always fail. ")
-(define indFlowCmdFail (judgment-holds
- (>
-  (((port 1) ((5))))
-  ((pc ())(aVar ((2))) (password ((7))))
-  ()
-  ((aVar := password) then (if (aVar)
-                                {(out ((port 1) < (num 42)))} else
-                                {(out ((port 1) < (num -1)))})) : Γ C)
- C))
-(define indFlowEnvFail (judgment-holds
- (>
-  (((port 1) ((5))))
-  ((pc ())(aVar ((2))) (password ((7))))
-  ()
-  ((aVar := password) then (if (aVar)
-                                {(out ((port 1) < (num 42)))} else
-                                {(out ((port 1) < (num -1)))})) : Γ C)
- Γ))
-;indFlowEnvFail
-indFlowCmdFail
-(judgment-holds (⟹
-                 ,(first indFlowEnvFail)
-                 ,(first indFlowCmdFail) : C ) C)
+; The static type of the port.
+(define portEnv (term (((port 1) ((3 5))))))
 
-(term (optimize-expression ((pc ()) (*aVar ((7)))) (pc ⊆ *aVar)))
-(term (optimize-expression ((pc ((7))) (*aVar ((7)))) (pc ⊆ ((7)))))
-(term (optimize-expression ((pc ((7))) (*aVar ((7)))) (((7)) ⊆ ((7)))))
 
+;(println "indirect flow where dynamic check is necessary without optimization ")
+;(define indFlowCmd (judgment-holds (> ,portEnv ,indFlowTypes () ,program : Γ C) C))
+
+(println "Dynamic check is necessary.")
+
+(define indFlowTypes (term ((pc ())(*pc ())(aVar ((3))) (*aVar ((3))) (password ((3)(5)(2))) (*password ((3)(5)(2))))))
+
+(term (optimize
+       ,(first (judgment-holds (> ,portEnv ,indFlowTypes () ,program : Γ C) C))
+       ,(first (judgment-holds (> ,portEnv ,indFlowTypes () ,program : Γ C) Γ))))
+
+(println "Dynamic check is not necessary because output will always succeed. ")
+
+(define indFlowSucEnv (term ((pc ())(*pc ())(aVar ((3))) (*aVar ((3))) (password ((3) (5))) (*password ((3) (5))))) )
+
+(term (optimize
+       ,(first (judgment-holds (> ,portEnv ,indFlowSucEnv () ,program : Γ C) C))
+       ,(first (judgment-holds (> ,portEnv ,indFlowSucEnv () ,program : Γ C) Γ))))
+
+(println "Dynamic check is not necessary because output will always fail. ")
+
+(define indFlowFailEnv (term ((pc ())(*pc ())(aVar ((2))) (*aVar ((2))) (password ((2) (4))) (*password ((2) (4))))) )
+
+(term (optimize
+       ,(first (judgment-holds (> ,portEnv ,indFlowFailEnv () ,program : Γ C) C))
+       ,(first (judgment-holds (> ,portEnv ,indFlowFailEnv () ,program : Γ C) Γ))))
 

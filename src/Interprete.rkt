@@ -1,8 +1,9 @@
 #lang racket
 (require redex "Grammar.rkt" "Typecheck.rkt")
 
-(provide ⇓ fresh-location evals-to-biggerzero? evals-to-zero? ext subst lookup eval booleanToN)
+(provide ⇓ evals-to-biggerzero? evals-to-zero? subst eval )
 
+; ⇓ interpretes a VSIDO program; in particular, it outputs a list with the output for each port.
 (define-judgment-form VSIDO
   #:mode (⇓ I I I O)
   #:contract (⇓ μ C : μ)
@@ -47,6 +48,7 @@
    (⇓ μ_1 (while (E_1) do {C_1}) : μ_1)])
 
 
+; Helper judgmement. Holds if E under μ evaluates to the numeric value zero.
 (define-judgment-form VSIDO
   #:mode (evals-to-zero? I I)
   #:contract (evals-to-zero? μ E)
@@ -54,8 +56,9 @@
    ---------------------------
    (evals-to-zero? μ_1 (E_1 ⊆ E_2) )]
   [(evals-to-zero? _ (side-condition (name N_1 N) (not (positive? (second (term N_1))))))]
-  [(evals-to-zero? (_ ... (V (side-condition (name N_1 N) (not (positive? (second (term N_1)))))) _ ... ) V)]
-)
+  [(evals-to-zero? (_ ... (V (side-condition (name N_1 N) (not (positive? (second (term N_1)))))) _ ... ) V)])
+
+; Helper judgmement. Holds if E under μ evaluates to a numeric value bigger than zero.
 (define-judgment-form VSIDO
   #:mode (evals-to-biggerzero? I I)
   #:contract (evals-to-biggerzero? μ E)
@@ -63,9 +66,9 @@
    ---------------------------
    (evals-to-biggerzero? μ_1 (E_1 ⊆ E_2) )]
   [(evals-to-biggerzero? _ (side-condition (name N_1 N) (positive? (second (term N_1)))))]
-  [(evals-to-biggerzero? (_ ... (V (side-condition (name N_1 N) (positive? (second (term N_1))))) _ ... ) V)]
-  )
+  [(evals-to-biggerzero? (_ ... (V (side-condition (name N_1 N) (positive? (second (term N_1))))) _ ... ) V)]  )
 
+; Evals an expression to a number or a runtime type.
 (define-metafunction VSIDO
   eval : μ E -> any
   [(eval _ N) N]
@@ -80,14 +83,14 @@
   
   [(eval μ_1 (E_1 ∪ E_2)) (,(set-union
                              (first (term (eval μ_1 E_1)))
-                             (first (term (eval μ_1 E_2)))))]
-  [(eval _ any) any]) ; TODO is this a good idea?
+                             (first (term (eval μ_1 E_2)))))])
 
-(define-metafunction VSIDO
-  booleanToN : boolean -> N
-  [(booleanToN #t) (num 1)]
-  [(booleanToN #f) (num 0)])
+;(define-metafunction VSIDO
+;  booleanToN : boolean -> N
+;  [(booleanToN #t) (num 1)]
+;  [(booleanToN #f) (num 0)])
 
+; Substitue a variable with a location.
 (define-metafunction VSIDO
   subst : M X L -> M
   [(subst (if (       E_1       ) {       C_1       } else {       C_2       }) X L_2)
@@ -109,8 +112,9 @@
   [(subst X X L) L]
   [(subst any _ _) any])
 
+; Create a location that is not yet being used within a term.
 (define-metafunction VSIDO
-  fresh-location : μ -> any
+  fresh-location : μ -> L
   [(fresh-location ()) (loc 1)]
   [(fresh-location μ_1)
    (loc ,(+

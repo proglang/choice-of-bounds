@@ -1,11 +1,9 @@
 #lang racket
 (require redex "../src/Interprete.rkt")
 
-#|
-These examples demonstrate the semantics of VSIDO. To view results, simply execute this file.
-|#
+; Nontrivial example programs.
 
-(println "example program: multiplication, written using locations")
+(println "Example program: multiplication, written using locations")
 
 (define mult8by3Locs (term (
   ((loc 0) := (num 8)) then
@@ -19,7 +17,7 @@ These examples demonstrate the semantics of VSIDO. To view results, simply execu
 	,mult8by3Locs
 	: μ ) μ)
 
-(println "example program: multiplication, written using variables")
+(println "Example program: multiplication, written using variables")
 
 (define mult8by3Vars (term
 (let var increment := (num 8) in
@@ -29,13 +27,9 @@ These examples demonstrate the semantics of VSIDO. To view results, simply execu
   ((result := (result + increment)) then
    (counter := (counter + (num -1))))}))))))
 
-(judgment-holds (⇓ ()
-	,mult8by3Vars
-	: μ ) μ)
+(judgment-holds (⇓ () ,mult8by3Vars : μ ) μ)
 
-#|
-Simple example terms.
-|#
+; Simple example terms.
 
 (println "writing a value to a port")
 (judgment-holds (⇓ (((port 8080) ((num 30))))

@@ -51,8 +51,17 @@
 (println "x-if.")
 (judgment-holds
  (>
-  (((port 1) ((4 5)(6))))
+  (((port 1) ((4 5 6))))
   ((aVar ((5))) (highVar ((9))) (lowVar ((2))))
   ()
   (if (aVar) {(out ((port 1) < highVar))} else {(out ((port 1) < lowVar))}) : Γ C)
+ C)
+
+(println "x-while")
+(judgment-holds
+ (>
+  ()
+  ((x ((5))) (*x ((5))))
+  ()
+  (while (x) do {(x := (num -1))}) : Γ C)
  C)
