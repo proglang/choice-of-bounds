@@ -18,9 +18,7 @@
      skip
      halt)
   (E ::= N
-     NonNumericalExpression ; A helper expression for pattern matching.
-     ) 
-  (LabelledE (E N))
+     NonNumericalExpression) ; A helper expression for pattern matching.
   (NonNumericalExpression ::=
                           V (E + E) ; Expression relevant to interpreting the program.
                           (dcl E LAB LAB LAB) ; A declassification.

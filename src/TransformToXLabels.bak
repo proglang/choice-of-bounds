@@ -3,16 +3,11 @@
 
 (require redex  "Grammar.rkt" "Typecheck.rkt" rackunit)
 
-(provide ⟿ > transformToExplicitLabels)
-
-(define-metafunction VSIDO
-  transformToExplicitLabels : Σ Γ T C -> C
-  [(transformToExplicitLabels Σ_1 Γ_1 T_1 C_1) ,(first (judgment-holds (> Σ_1 Γ_1 () C_1 : _ C_2) C_2))])
+(provide ⟿ >)
 
 ; The two judgment forms ⟿ and > translate a command into a command with explicit label handling.
 
 ; ⟿ does explicit lable handling for expressions.
-; XXX
 (define-judgment-form VSIDO 
   #:mode     (⟿ I I I O O)
   #:contract (⟿ Γ E : T C)
@@ -46,7 +41,6 @@
 ; This implementation differs from the semantics in the paper in that
 ; 1) the is no explicit mapping from each expression and subexpression to a program point
 ; 2) the resulting var is not guaranteed to be unique.
-; XXX
 (define-metafunction VSIDO
   lab : E -> V
   [(lab V)              ,(string->symbol (string-append "*"   (symbol->string (term V))))]
@@ -108,7 +102,7 @@
    (> Σ_1 Γ_1 T_c (if (E_1) {C_1} else {C_2}) :
       (choiceEnv Γ_2 Γ_3)
       (C_3 then (let var pc := (pc ∪ (lab E_1)) in (if (E_1) {C_4} else {C_5}))))]
-  ; XXX
+
   [(where Γ_3 (findWhileEnv Σ_1 ((placeholderVarToMakeUniqueEnv98123797$&§?=§$=&1 ())) T_c (while (E_1) do {C_1}) Γ_1))
    (⟿ Γ_3 E_1 : T_1 C_expr)
    (> Σ_1 Γ_3 (multiplication T_c T_1) C_1 : Γ_2 C_body)

@@ -18,17 +18,23 @@
 
 (define indFlowTypes (term ((pc ())(*pc ())(aVar ((3))) (*aVar ((3))) (password ((3)(5)(2))) (*password ((3)(5)(2))))))
 
-(term (optimize (transformToExplicitLabels ,portEnv ,indFlowTypes () ,program) ,indFlowTypes))
+(term (optimize
+       ,(first (judgment-holds (> ,portEnv ,indFlowTypes () ,program : Γ C) C))
+       ,(first (judgment-holds (> ,portEnv ,indFlowTypes () ,program : Γ C) Γ))))
 
 (println "Dynamic check is not necessary because output will always succeed. ")
 
 (define indFlowSucEnv (term ((pc ())(*pc ())(aVar ((3))) (*aVar ((3))) (password ((3) (5))) (*password ((3) (5))))) )
 
-(term (optimize (transformToExplicitLabels ,portEnv ,indFlowSucEnv () ,program) ,indFlowSucEnv))
+(term (optimize
+       ,(first (judgment-holds (> ,portEnv ,indFlowSucEnv () ,program : Γ C) C))
+       ,(first (judgment-holds (> ,portEnv ,indFlowSucEnv () ,program : Γ C) Γ))))
 
 (println "Dynamic check is not necessary because output will always fail. ")
 
 (define indFlowFailEnv (term ((pc ())(*pc ())(aVar ((2))) (*aVar ((2))) (password ((2) (4))) (*password ((2) (4))))) )
 
-(term (optimize (transformToExplicitLabels ,portEnv ,indFlowFailEnv () ,program) ,indFlowFailEnv))
+(term (optimize
+       ,(first (judgment-holds (> ,portEnv ,indFlowFailEnv () ,program : Γ C) C))
+       ,(first (judgment-holds (> ,portEnv ,indFlowFailEnv () ,program : Γ C) Γ))))
 
