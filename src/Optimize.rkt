@@ -2,9 +2,15 @@
 
 (require redex  "Grammar.rkt" "Typecheck.rkt" "Interprete.rkt" "../src/TransformToXLabels.rkt" "../src/Interprete.rkt" rackunit)
 
-(provide ⟹ comparison-always-true?  eliminateDeadCode optimize eliminateDead comparison-always-false? opt-expr decideSums substVarsWithInnersets optimizeSkipAndHalts)
+(provide ⟹ optimize)
 
-
+; First do all one-pass optimizations by executing the judgment ⟹, then do the optimizations that require repeated execution.
+(define-metafunction VSIDO
+  optimize : C Γ -> C
+  [(optimize C_1 Γ_1)
+   (eliminateDeadCode
+        halt ; start value
+        ,(first (judgment-holds (⟹ Γ_1 () C_1 : Γ C ) C)))])
 
 ; Answer true iff for two given types T_1 and T_2: σ ∈ T_1 and τ ∈ T_2 . σ ⊆ τ
 (define-metafunction VSIDO
@@ -40,8 +46,8 @@
 ; decideComparison ((x) ((1 2 9) (3 4)))   (x ⊆ ((1 2 3 4))) -> (x ⊆ ((1 2 3 4)))
 (define-metafunction VSIDO
   decideComparison : Γ E -> E
-  [(decideComparison Γ_1 (() ⊆ VOrT_2)) (num 1)]
-  [(decideComparison Γ_1 (VOrT_1 ⊆ ())) (num 0)]
+  [(decideComparison Γ_1 (() ⊆ _)) (num 1)]
+  [(decideComparison Γ_1 (_ ⊆ ())) (num 0)]
   [(decideComparison Γ_1 (VOrT_1 ⊆ VOrT_2)) (num 1)
    (side-condition (term (comparison-always-true?
                           (lookupOrDefault Γ_1 VOrT_1)
@@ -68,15 +74,16 @@
    (side-condition (term (comparison-always-true?
                           (lookupOrDefault Γ_1 VOrT_2)
                           (lookupOrDefault Γ_1 VOrT_1))))]
-  [(decideSums _ ((LABS_1) ∪ (LABS_2))) (,(set-union (term LABS_1) (term LABS_2)))]
+  [(decideSums _ (T_1 ∪ T_2)) (choice T_1 T_2)]
   [(decideSums Γ_1 (E_1 ⊆ E_2)) ((decideSums Γ_1 E_1) ⊆ E_2)]
-  [(decideSums Γ_1 E_1) E_1])
+  [(decideSums _ E_1) E_1])
 
 ; If a variable only represents a COB with a single choice, replace it with its inner set.
 (define-metafunction VSIDO
   substVarsWithInnersets : Γ E -> E
   ; Base case: Replace Vars that only map to one inner set
-  [(substVarsWithInnersets (_ ... (V_1 TR_1) _ ...) V_1) TR_1]
+  [(substVarsWithInnersets (_ ... (V_1 (LABS_1)) _ ...) V_1) (LABS_1)]
+  [(substVarsWithInnersets (_ ... (V_1 ()) _ ...) V_1) ()]
   ; DFS
   [(substVarsWithInnersets Γ_1 (E_1 ∪ E_2))
    ((substVarsWithInnersets Γ_1 E_1) ∪ (substVarsWithInnersets Γ_1 E_2))]
@@ -88,19 +95,21 @@
 ; Helper metafuntion for optimizing expressions.
 (define-metafunction VSIDO
   opt-expr : Γ E -> E
-  [(opt-expr Γ_1 E_1)
+  [(opt-expr Γ_1 TypedE_1)
    (decideComparison Γ_1
                      (decideSums Γ_1
-                                 (substVarsWithInnersets Γ_1 E_1)))])
+                                 (substVarsWithInnersets Γ_1 TypedE_1)))]
+  [(opt-expr _ E_1) E_1])
 
 ; Implement all optimization rules apart from ASSIGN-DEAD and LET-DEAD.
 (define-judgment-form VSIDO 
   #:mode     (⟹ I I I I O O)
   #:contract (⟹ Γ T C : Γ C)
-  [
+  [(where NonNumericalExpression_1 (opt-expr Γ_1 E_1))
+   (where T_2 (multiplication T_c (evalT Γ_1 E_1)))
    --------------------------- R-ASSIGN
    (⟹ Γ_1 T_c (V_1 := E_1) :
-      (ext Γ_1 V_1 (multiplication T_c (evalT Γ_1 E_1)))
+      (ext (ext Γ_1 V_1 T_2) (lab V_1) T_2)
       (V_1 := (opt-expr Γ_1 E_1)))]
 
   [(where (num 1) (opt-expr Γ_1 E_1))
@@ -117,20 +126,20 @@
       Γ_2
       C_2)]
 
-  [(where NonNumericalExpression (opt-expr Γ_1 E_1))
+  [(where NonNumericalExpression_1 (opt-expr Γ_1 E_1))
    (⟹ Γ_1 T_c C_1 : Γ_3 C_3)
    (⟹ Γ_1 T_c C_2 : Γ_4 C_4)
    --------------------------- IF-UNOPTIMIZED
    (⟹ Γ_1 T_c (if (E_1) {C_1} else {C_2}) :
       (choiceEnv Γ_3 Γ_4)
-      (if (E_1) {C_3} else {C_4}))]
+      (if (NonNumericalExpression_1) {C_3} else {C_4}))]
 
   
   [(⟹ Γ_1 T_c C_1 : Γ_2 C_3)
    (⟹ Γ_2 T_c C_2 : Γ_3 C_4)
    --------------------------- R-SEQ
    (⟹ Γ_1 T_c (C_1 then C_2) :
-      Γ_3
+      (choiceEnv Γ_2 Γ_3)
       (C_3 then C_4))]
 
     [(⟹ (ext Γ_1 V_1 (evalT Γ_1 E_1)) T_c C_1 : Γ_2 C_2)
@@ -152,7 +161,7 @@
   [ (⟹ Γ_1 T_c skip : Γ_1 skip) ]
   [ (⟹ Γ_1 T_c halt : Γ_1 halt) ])
 
-; Convenience function that makes the resulting program look nicer.
+; Convenience function that makes the resulting program smaller.
 (define-metafunction VSIDO
   optimizeSkipAndHalts : C -> C
   [(optimizeSkipAndHalts (skip then C_1))
@@ -175,15 +184,13 @@
 (define-metafunction VSIDO
   eliminateDead :
   C ; Command which is to be optimizied.
-  (X ...) ; Variables that will be used after the input .
+  (X ...) ; Variables that need to be kept alive.
   -> C
-  ; LETVAR-DEAD
   [(eliminateDead (let var X_1 := E_1 in C_1) any_ls)
    C_elim
    (where C_elim (eliminateDead C_1 any_ls))
    (side-condition (not (member (term X_1) (term (free C_elim)))))]
-  ; ASSIGN-DEAD TODO: While-sicher!
-  [(eliminateDead (X_1 := E_1) any_ls)
+  [(eliminateDead (X_1 := any_1) any_ls)
    skip
    (side-condition (not (member (term X_1) (term any_ls))))]
   [(eliminateDead (C_1 then C_2) any_contextVars)
@@ -197,20 +204,13 @@
 
 
 ; Helper function to iteratively eliminate dead code. The two subfunctions create new opportunities for each other:
-; optimizeSkipAndHalts can end the life of an variable, for example: (halt then x := y) when this is the only use of y.
-; eliminateDeadCode can create new skips and halts, for example: (x := y) => skip, when x is dead.
+; optimizeSkipAndHalts can end the life of an variable, for example: (halt then x := y) ends y if this is the only use of y.
+; eliminateDeadCode can create new skips and halts, for example: (x := y) yields skip if x is not used afterwards.
 (define-metafunction VSIDO
   eliminateDeadCode : C C -> C
   [(eliminateDeadCode C_old C_new)
    C_old
    (side-condition (equal? (term C_old) (term C_new)))]
-  [(eliminateDeadCode C_old C_new)
+  [(eliminateDeadCode _ C_new)
    (eliminateDeadCode C_new (optimizeSkipAndHalts (eliminateDead C_new ())))])
 
-; First do all one-pass optimizations by executing the judgment ⟹, then do the optimizations that require repeated execution.
-(define-metafunction VSIDO
-  optimize : C Γ -> C
-  [(optimize C_1 Γ_1)
-   (eliminateDeadCode
-        halt ; start value
-        ,(first (judgment-holds (⟹ Γ_1 () C_1 : Γ C ) C)))])

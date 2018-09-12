@@ -18,25 +18,38 @@
      skip
      halt)
   (E ::= N
-     NonNumericalExpression ; A helper expression for pattern matching.
-     ) 
-  (LabelledE (E N))
-  (NonNumericalExpression ::=
-                          V (E + E) ; Expression relevant to interpreting the program.
-                          (dcl E LAB LAB LAB) ; A declassification.
-                          TR ; A least upper bound of a COB type's inner sets.
-                          (E ∪ E) ; Runtime union of two sets of lables.
-                          (E ⊆ E)) ; Runtime check whether one set of labels is contained in the other.
+     (E :: variable-not-otherwise-mentioned) ; An expression with a unique marker associated with a label.
+     V ; A variable.
+     (E + E) ; Expression relevant to interpreting the program.
+     (dcl E LAB LAB LAB) ; A declassification.
+     T ; A COB type.
+     (E ∪ E) ; Runtime union of two sets of lables.
+     (E ⊆ E)) ; Runtime check whether one set of labels is contained in the other.
   (STORE-ELEM ::= (V TR) (V N) (P (N ...))) ; Helper sum for locations and ports.
   (μ ::= (STORE-ELEM ...)) ; the evaluation environment
   (LAB ::= number) ; A label. For now, simply a number.
   (LABS ::= (LAB LAB ...)) ; A nonempty set of labels. Used both as inner set of a COB or a lub of a COB.
   (T ::= (LABS ...)) ; COB type. Contains zero or more inner sets consisting of labels.
-  (TR := (LABS) ()) ; Reified COB type - contains on inner set at most because at runtime there is only one control flow to represent.
   (Γ ::= ((V T) ...)) ; Variable type environment.
   (Σ ::= ((P T) ...)) ; Port type environment.
-  (VOrT := T V) ; Helper for easier pattern matching in optimizing. Semantically, runtime types or reprentations of it.
-  (M ::= C E μ)) ; Helper needed for the substitution function
+  ; From here on, non-terminals are introduced to make pattern matching a bit easier.
+  (LabelledE (E :: variable-not-otherwise-mentioned) V)
+  (TypedE ::=
+          (dcl E LAB LAB LAB)
+          (E ⊆ E)
+          (E ∪ E)
+          T
+          (variable-prefix labelvar-))
+  (NonNumericalExpression ::=
+                          LabelledE
+                          V
+                          (E + E)
+                          (dcl E LAB LAB LAB) 
+                          T
+                          (E ∪ E) 
+                          (E ⊆ E))
+  (VOrT := T V)
+  (M ::= C E μ))
   
 ; Updates an environment.
 ; If a port should be updated, the new value either gets appended to the existing port or a new port is introduced into the environment.
